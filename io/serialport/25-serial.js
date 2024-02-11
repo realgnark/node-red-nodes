@@ -94,18 +94,35 @@ module.exports = function(RED) {
         this.serialConfig = RED.nodes.getNode(this.serial);
 
         if (this.serialConfig) {
-            var node = this;
-            node.status({fill:"grey",shape:"dot",text:"node-red:common.status.not-connected"});
-            node.port = serialPool.get(this.serialConfig);
+            var
+            node = this,
+            conn = function() {
+                node.status({fill:"grey",shape:"dot",text:"node-red:common.status.not-connected"});
+                node.port = serialPool.get(node.serialConfig);
 
-            this.port.on('data', function(msgout) {
-                node.send(msgout);
-            });
-            this.port.on('ready', function() {
-                node.status({fill:"green",shape:"dot",text:"node-red:common.status.connected"});
-            });
-            this.port.on('closed', function() {
-                node.status({fill:"red",shape:"ring",text:"node-red:common.status.not-connected"});
+                node.port.on('data', function(msgout) {
+                    node.send(msgout);
+                });
+                node.port.on('ready', function() {
+                    node.status({fill:"green",shape:"dot",text:"node-red:common.status.connected"});
+                });
+                node.port.on('closed', function() {
+                    node.status({fill:"red",shape:"ring",text:"node-red:common.status.not-connected"});
+                });
+            };
+
+            conn();
+
+            node.on("input",function(msg) {
+                if (msg.hasOwnProperty("restart")) {
+                    try {
+                        serialPool.close(node.serialConfig.serialport,function(){
+                            conn();
+                        });
+                    } catch (e) {
+                        node.error("restart failed",msg);
+                    }
+                }
             });
         }
         else {
